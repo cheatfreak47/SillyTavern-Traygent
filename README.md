@@ -11,7 +11,8 @@ Tucks SillyTavern into your system tray. No windows, no fuss.
    - Pin to Taskbar/Start
 
 ## Features
-- Opens SillyTavern in browser if you accidentally launch twice or double click the tray icon
 - Tucks SillyTavern into your systemtray instead of an active console window
+- Right clicking the tray icon offers the option of opening the webpage, restarting the server, or closing the server
+- Opens SillyTavern in browser if you accidentally launch twice or double click the tray icon
 - Properly kills background processes when exiting
 - Config-free single-file operation

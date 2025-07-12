@@ -34,18 +34,22 @@ Menu, Tray, Add, SillyTavern Traygent, HandlerLabel
 Menu, Tray, Disable, SillyTavern Traygent ; Gray out an item
 Menu, Tray, Add ; Adds a separator line
 Menu, Tray, Add, Open, HandlerOpen
+Menu, Tray, Add, Restart, HandlerRestart
 Menu, Tray, Add, Exit, HandlerExit
 Menu, Tray, Default, Open ; Makes double-click open the server
 
 OnExit("TerminationProtocol")
 
 ; actually call the Start.bat file
+MainLogic:
 if !FileExist("Start.bat") {
     MsgBox, 16, Error, Start.bat not found!
     ExitApp
 }
 
 RunWait, "Start.bat", , Hide, PID
+;In the event that the server dies but our script doesn't... we will probably just terminate too, so that's what this is.
+ExitApp
 
 HandlerOpen:
     ; Your open action here
@@ -53,6 +57,11 @@ HandlerOpen:
 return
 
 HandlerLabel:
+return
+
+HandlerRestart:
+	TerminationProtocol()
+	goto MainLogic
 return
 
 HandlerExit:
