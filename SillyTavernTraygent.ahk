@@ -1,6 +1,6 @@
 #NoEnv
 SetWorkingDir %A_ScriptDir%
-; Selfbuild stuff
+; SelfBuild Stuff Part 1
 if (!A_IsCompiled) {
 	; Checks to see if the script was ran with --build. If so, it performs the Build tasks near the bottom of the script.
 	Loop, % A_Args.Length()
@@ -14,10 +14,19 @@ if (!A_IsCompiled) {
     ExitApp
 }
 
+; Detect port for SillyTavern Server
+FileRead, config, config.yaml
+if RegExMatch(config, "port:\s*\K\d+", match) {
+    port := match  ; Legacy-style access for AHK v1.1
+} else {
+    MsgBox, 16, Error, Port could not be read from config.yaml.
+	ExitApp
+}
+
 ; We check if the script is running already in case we're a second instance. If we are, we just open the page and exit!
 DetectHiddenWindows, On
 if WinExist("SillyTavernTraygent ahk_class AutoHotkey") {
-    Run, http://127.0.0.1:8000
+    Run, http://127.0.0.1:%port%
     ExitApp
 }
 ; This is what tips us off earlier in the script that there's another instance.
@@ -35,6 +44,7 @@ Menu, Tray, Disable, SillyTavern Traygent ; Gray out an item
 Menu, Tray, Add ; Adds a separator line
 Menu, Tray, Add, Open, HandlerOpen
 Menu, Tray, Add, Restart, HandlerRestart
+Menu, Tray, Add, Update, HandlerUpdate
 Menu, Tray, Add, Exit, HandlerExit
 Menu, Tray, Default, Open ; Makes double-click open the server
 
@@ -46,14 +56,17 @@ if !FileExist("Start.bat") {
     MsgBox, 16, Error, Start.bat not found!
     ExitApp
 }
-
 RunWait, "Start.bat", , Hide, PID
 ;In the event that the server dies but our script doesn't... we will probably just terminate too, so that's what this is.
 ExitApp
 
+Update:
+RunWait, "cmd.exe" /c git pull, , Hide
+goto MainLogic
+
 HandlerOpen:
     ; Your open action here
-    Run, http://127.0.0.1:8000
+    Run, http://127.0.0.1:%port%
 return
 
 HandlerLabel:
@@ -64,10 +77,16 @@ HandlerRestart:
 	goto MainLogic
 return
 
+HandlerUpdate:
+	TerminationProtocol()
+	goto Update
+return
+
 HandlerExit:
     ExitApp
 return
 
+; Function that bodyslams the server whenever I need it
 TerminationProtocol() {
     global PID
     if (PID) {
@@ -77,7 +96,7 @@ TerminationProtocol() {
 }
 ExitApp
 
-; more selfbuild stuff
+; SelfBuild Stuff Part 2
 Build:
 	; Try to read the install location of AutoHotKey 1.1 from the 64-bit registry path
 	RegRead, InstallDir, HKEY_LOCAL_MACHINE, SOFTWARE\Wow6432Node\AutoHotkey, InstallDir
