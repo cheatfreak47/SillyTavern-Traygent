@@ -1,8 +1,9 @@
 #NoEnv
 SetWorkingDir %A_ScriptDir%
-; SelfBuild Stuff Part 1
+; ================ SELF BUILDING CHECK ================
 if (!A_IsCompiled) {
 	; Checks to see if the script was ran with --build. If so, it performs the Build tasks near the bottom of the script.
+	; Else, through error.
 	Loop, % A_Args.Length()
 	{
 		if (A_Args[A_Index] = "--build") {
@@ -14,7 +15,7 @@ if (!A_IsCompiled) {
     ExitApp
 }
 
-; Detect port for SillyTavern Server
+; ===================== READ PORT =====================
 FileRead, config, config.yaml
 if RegExMatch(config, "port:\s*\K\d+", match) {
     port := match  ; Legacy-style access for AHK v1.1
@@ -23,80 +24,94 @@ if RegExMatch(config, "port:\s*\K\d+", match) {
 	ExitApp
 }
 
-; We check if the script is running already in case we're a second instance. If we are, we just open the page and exit!
+; ============ SINGLE INSTANCE ENFORCEMENT ============
 DetectHiddenWindows, On
+; We check if another window with our class exists yet, if it does, we are a second instance.
 if WinExist("SillyTavernTraygent ahk_class AutoHotkey") {
     Run, http://127.0.0.1:%port%
     ExitApp
 }
-; This is what tips us off earlier in the script that there's another instance.
+; If we're not, we set our class so any future second instances will be caught.
 WinSetTitle, ahk_class AutoHotkey, , SillyTavernTraygent
-; Just in case that doesn't work, we fall back on standard detection
+; In the event something is missed we fallback on forced SingleInstance mode.
 #SingleInstance Force
 
-; Set the Tray tooltip
-Menu, Tray, Tip, SillyTavern
 
-; Add menu Tray items
+; ================== BUILD TRAY MENU ==================
+Menu, Tray, Tip, SillyTavern ; Tooltip
 Menu, Tray, NoStandard ; Remove all default items
-Menu, Tray, Add, SillyTavern Traygent, HandlerLabel
-Menu, Tray, Disable, SillyTavern Traygent ; Gray out an item
+Menu, Tray, Add, SillyTavern Traygent, DoNothing ; Tray label, Dummy functionality
+Menu, Tray, Disable, SillyTavern Traygent ; Disable it so it's not clickable
 Menu, Tray, Add ; Adds a separator line
-Menu, Tray, Add, Open, HandlerOpen
-Menu, Tray, Add, Restart, HandlerRestart
-Menu, Tray, Add, Update, HandlerUpdate
-Menu, Tray, Add, Exit, HandlerExit
-Menu, Tray, Default, Open ; Makes double-click open the server
+Menu, Tray, Add, Open, HandlerOpen ; Open SillyTavern in browser
+Menu, Tray, Add, Restart, HandlerRestart ; Restart Server
+Menu, Tray, Add, Update, HandlerUpdate ; Git Pull the latest SillyTavern Server
+Menu, Tray, Add, Toggle Console, HandlerConsoleToggle ; Toggle Console Window visibilty
+Menu, Tray, Add, Exit, HandlerExit ; Close server and exit the tray agent
+Menu, Tray, Default, Open ; Double click the icon also opens SillyTavern in the browser
 
-OnExit("TerminationProtocol")
+; ================== MAIN OPERATION ===================
+OnExit("TerminationProtocol") ; When the script exits it should terminate the server.
 
-; actually call the Start.bat file
 MainLogic:
+; Make sure user isn't an idiot
 if !FileExist("Start.bat") {
     MsgBox, 16, Error, Start.bat not found!
     ExitApp
 }
+; We track console visibility to control it via tray icon
+cmdVisible := false
 RunWait, "Start.bat", , Hide, PID
-;In the event that the server dies but our script doesn't... we will probably just terminate too, so that's what this is.
-ExitApp
 
-Update:
-RunWait, "cmd.exe" /c git pull, , Hide
+; This code only gets ran if the server is killed, crashes, or is closed by the user closing the console window.
+MsgBox, 16, Error, SillyTavern Server Unexpectedly Closed.`nRestarting server...
 goto MainLogic
 
+; =================== TRAY FUNCTIONS ==================
 HandlerOpen:
-    ; Your open action here
-    Run, http://127.0.0.1:%port%
+    Run, http://127.0.0.1:%port% ; Open the server in browser
 return
 
-HandlerLabel:
+DoNothing:
+ ; Do... nothing! Spooky.
 return
 
 HandlerRestart:
-	TerminationProtocol()
-	goto MainLogic
+	TerminationProtocol() ; Terminate server
+	goto MainLogic ; Restart server
 return
 
 HandlerUpdate:
-	TerminationProtocol()
-	goto Update
+	TerminationProtocol() ; Terminate server
+	RunWait, "cmd.exe" /c git pull, , Hide ; Update server
+	goto MainLogic ; Restart server
+return
+
+HandlerConsoleToggle:
+    If (cmdVisible) {
+        WinHide, ahk_pid %PID% ; hide the console
+        cmdVisible := false ; mark it as hidden
+    } else {
+        WinShow, ahk_pid %PID% ; show the console 
+        WinActivate, ahk_pid %PID% ; foreground it
+        cmdVisible := true ; mark it as visible
+    }
 return
 
 HandlerExit:
     ExitApp
 return
 
-; Function that bodyslams the server whenever I need it
+; ====================== FUNCTIONS ====================
 TerminationProtocol() {
-    global PID
+    global PID ; makes PID a global var so it can be read from other threads
     if (PID) {
-        RunWait, taskkill /pid %PID% /f /t, , Hide
+        RunWait, taskkill /pid %PID% /f /t, , Hide ; BODYSLAM THE SERVER BABY
     }
     return
 }
-ExitApp
 
-; SelfBuild Stuff Part 2
+; =================== BUILD SECTION ===================
 Build:
 	; Try to read the install location of AutoHotKey 1.1 from the 64-bit registry path
 	RegRead, InstallDir, HKEY_LOCAL_MACHINE, SOFTWARE\Wow6432Node\AutoHotkey, InstallDir
